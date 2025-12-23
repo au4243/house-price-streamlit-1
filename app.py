@@ -1,13 +1,11 @@
-<<<<<<< HEAD
+
 import streamlit as st
 import os
 import json
 
 from predict import HousePricePredictor
 
-# =========================
-# 頁面設定
-# =========================
+
 st.set_page_config(
     page_title="房價估價系統",
     page_icon="🏠",
@@ -17,9 +15,7 @@ st.set_page_config(
 st.title("🏠 房價估價與 SHAP 解釋系統")
 st.caption("XGBoost + 可解釋 AI（SHAP）｜依據 114 年 Q1~Q3 不動產成交資料")
 
-# =========================
-# 行政區對照表
-# =========================
+
 CITY_TOWN_MAP = {
     "臺北市": [
         "士林區",
@@ -435,21 +431,17 @@ CITY_TOWN_MAP = {
     ],
     
 }
-# =========================
-# 載入模型（快取）
-# =========================
+
 @st.cache_resource
 def load_predictor():
     return HousePricePredictor()
 
 predictor = load_predictor()
 
-# =========================
-# 側邊欄輸入
-# =========================
+
 st.sidebar.header("📋 房屋基本資料")
 
-# --- 行政區（拆成兩欄） ---
+
 city = st.sidebar.selectbox(
     "縣市",
     list(CITY_TOWN_MAP.keys()),
@@ -460,11 +452,11 @@ town = st.sidebar.selectbox(
     CITY_TOWN_MAP[city],
 )
 
-# ⭐ 合併成模型需要的格式
+
 district = f"{city}{town}"
 st.sidebar.caption(f"📍 行政區：{district}")
 
-# --- 其他欄位 ---
+
 building_type = st.sidebar.selectbox(
     "建物型態",
     ["住宅大樓", "華廈", "公寓", "透天厝"],
@@ -520,9 +512,7 @@ has_elevator = st.sidebar.radio(
     ["有", "無"],
 )
 
-# =========================
-# 組合輸入資料
-# =========================
+
 case_dict = {
     "district": district,
     "building_type": building_type,
@@ -537,9 +527,7 @@ case_dict = {
     "has_elevator": 1 if has_elevator == "有" else 0,
 }
 
-# =========================
-# 主畫面
-# =========================
+
 st.subheader("📊 預測結果")
 
 if st.button("🚀 開始估價"):
@@ -547,28 +535,28 @@ if st.button("🚀 開始估價"):
     with st.spinner("模型預測中，請稍候..."):
         output_dir = predictor.export_prediction_bundle(case_dict)
 
-    # --- 讀取結果 ---
+   
     with open(os.path.join(output_dir, "prediction.json"), encoding="utf-8") as f:
         summary = json.load(f)
 
     with open(os.path.join(output_dir, "explanation.txt"), encoding="utf-8") as f:
         explanation = f.read()
 
-    # ====== 顯示預測價格 ======
+    
     st.success(f"💰 預測單價：約 **{summary['predicted_price_wan_per_ping']} 萬 / 坪**")
 
-    # ====== SHAP 圖 ======
+   
     st.subheader("🔍 價格影響因素（SHAP）")
     st.image(
         os.path.join(output_dir, "shap_waterfall.png"),
         use_container_width=True,
     )
 
-    # ====== 中文解釋 ======
+   
     st.subheader("📝 中文估價說明")
     st.text(explanation)
 
-    # ====== 下載區 ======
+    
     st.subheader("⬇️ 下載結果")
 
     with open(os.path.join(output_dir, "explanation.txt"), "rb") as f:
@@ -592,16 +580,14 @@ if st.button("🚀 開始估價"):
             file_name="prediction.json",
         )
 
-=======
+
 import streamlit as st
 import os
 import json
 
 from predict import HousePricePredictor
 
-# =========================
-# 頁面設定
-# =========================
+
 st.set_page_config(
     page_title="房價估價系統",
     page_icon="🏠",
@@ -611,9 +597,7 @@ st.set_page_config(
 st.title("🏠 房價估價與 SHAP 解釋系統")
 st.caption("XGBoost + 可解釋 AI（SHAP）｜依據 114 年 Q1~Q3 不動產成交資料")
 
-# =========================
-# 行政區對照表
-# =========================
+
 CITY_TOWN_MAP = {
     "臺北市": [
         "士林區",
@@ -1029,21 +1013,17 @@ CITY_TOWN_MAP = {
     ],
     
 }
-# =========================
-# 載入模型（快取）
-# =========================
+
 @st.cache_resource
 def load_predictor():
     return HousePricePredictor()
 
 predictor = load_predictor()
 
-# =========================
-# 側邊欄輸入
-# =========================
+
 st.sidebar.header("📋 房屋基本資料")
 
-# --- 行政區（拆成兩欄） ---
+
 city = st.sidebar.selectbox(
     "縣市",
     list(CITY_TOWN_MAP.keys()),
@@ -1054,11 +1034,11 @@ town = st.sidebar.selectbox(
     CITY_TOWN_MAP[city],
 )
 
-# ⭐ 合併成模型需要的格式
+
 district = f"{city}{town}"
 st.sidebar.caption(f"📍 行政區：{district}")
 
-# --- 其他欄位 ---
+
 building_type = st.sidebar.selectbox(
     "建物型態",
     ["住宅大樓", "華廈", "公寓", "透天厝"],
@@ -1114,9 +1094,7 @@ has_elevator = st.sidebar.radio(
     ["有", "無"],
 )
 
-# =========================
-# 組合輸入資料
-# =========================
+
 case_dict = {
     "district": district,
     "building_type": building_type,
@@ -1131,9 +1109,7 @@ case_dict = {
     "has_elevator": 1 if has_elevator == "有" else 0,
 }
 
-# =========================
-# 主畫面
-# =========================
+
 st.subheader("📊 預測結果")
 
 if st.button("🚀 開始估價"):
@@ -1141,28 +1117,28 @@ if st.button("🚀 開始估價"):
     with st.spinner("模型預測中，請稍候..."):
         output_dir = predictor.export_prediction_bundle(case_dict)
 
-    # --- 讀取結果 ---
+    
     with open(os.path.join(output_dir, "prediction.json"), encoding="utf-8") as f:
         summary = json.load(f)
 
     with open(os.path.join(output_dir, "explanation.txt"), encoding="utf-8") as f:
         explanation = f.read()
 
-    # ====== 顯示預測價格 ======
+    
     st.success(f"💰 預測單價：約 **{summary['predicted_price_wan_per_ping']} 萬 / 坪**")
 
-    # ====== SHAP 圖 ======
+    
     st.subheader("🔍 價格影響因素（SHAP）")
     st.image(
         os.path.join(output_dir, "shap_waterfall.png"),
         use_container_width=True,
     )
 
-    # ====== 中文解釋 ======
+    
     st.subheader("📝 中文估價說明")
     st.text(explanation)
 
-    # ====== 下載區 ======
+    
     st.subheader("⬇️ 下載結果")
 
     with open(os.path.join(output_dir, "explanation.txt"), "rb") as f:
@@ -1186,4 +1162,5 @@ if st.button("🚀 開始估價"):
             file_name="prediction.json",
         )
 
->>>>>>> 1df78f51412175b3bccafb94034672043ab8021b
+
+
