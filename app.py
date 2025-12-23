@@ -535,7 +535,7 @@ if st.button("🚀 開始估價"):
     with st.spinner("模型預測中，請稍候..."):
         output_dir = predictor.export_prediction_bundle(case_dict)
 
-   
+    
     with open(os.path.join(output_dir, "prediction.json"), encoding="utf-8") as f:
         summary = json.load(f)
 
@@ -545,14 +545,14 @@ if st.button("🚀 開始估價"):
     
     st.success(f"💰 預測單價：約 **{summary['predicted_price_wan_per_ping']} 萬 / 坪**")
 
-   
+    
     st.subheader("🔍 價格影響因素（SHAP）")
     st.image(
         os.path.join(output_dir, "shap_waterfall.png"),
         use_container_width=True,
     )
 
-   
+    
     st.subheader("📝 中文估價說明")
     st.text(explanation)
 
@@ -579,5 +579,4 @@ if st.button("🚀 開始估價"):
             f,
             file_name="prediction.json",
         )
-
 

@@ -16,9 +16,8 @@ mpl.rcParams["axes.unicode_minus"] = False
 
 
 class HousePricePredictor:
-    """
-    房價預測與 SHAP 解釋模組（正式部署等級）
-    """
+
+
 
     def __init__(
         self,
@@ -39,10 +38,10 @@ class HousePricePredictor:
             "main_use",
         ]
 
-  
+   
     @staticmethod
     def _pretty_name(col: str, value=None) -> str:
-        """模型欄位轉為中文可讀名稱"""
+        
         if col.startswith("district_"):
             return f"行政區：{col.replace('district_', '')}"
 
@@ -66,7 +65,7 @@ class HousePricePredictor:
         name = mapping.get(col, col)
         return f"{name} = {value}" if value is not None else name
 
-  
+    
     def _preprocess(self, case_dict: dict) -> pd.DataFrame:
 
         df = pd.DataFrame([case_dict])
@@ -96,24 +95,24 @@ class HousePricePredictor:
 
 
     def predict(self, case_dict: dict) -> float:
-        """預測單筆房屋單價（萬 / 坪）"""
+        
         X_case = self._preprocess(case_dict)
         return float(self.model.predict(X_case)[0])
 
-
+   
     def shap_values(self, case_dict: dict):
-        """回傳單筆 SHAP values 與特徵"""
+        
         X_case = self._preprocess(case_dict)
         shap_values = self.explainer.shap_values(X_case)
         return shap_values, X_case
 
-
+   
     def generate_chinese_explanation(
         self,
         case_dict: dict,
         top_n: int = 8,
     ) -> str:
-        """自動產生中文 SHAP 估價說明"""
+        
         shap_values, X_case = self.shap_values(case_dict)
 
         sv = shap_values[0]
@@ -144,7 +143,7 @@ class HousePricePredictor:
 
  
     def plot_shap_waterfall(self, case_dict: dict):
-        """顯示單筆 SHAP waterfall 圖"""
+        
         shap_values, X_case = self.shap_values(case_dict)
 
         shap.waterfall_plot(
@@ -157,7 +156,7 @@ class HousePricePredictor:
             show=True,
         )
 
-
+    
     def export_prediction_bundle(
         self,
         case_dict: dict,
