@@ -18,7 +18,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 
-mpl.rcParams["font.family"] = "Noto Sans CJK TC"
+mpl.rcParams["font.family"] = "Microsoft JhengHei"
 mpl.rcParams["axes.unicode_minus"] = False
 
 
