@@ -6,6 +6,9 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 
+# =========================
+# Matplotlib 中文設定
+# =========================
 mpl.rcParams["font.family"] = "Noto Sans CJK TC"
 mpl.rcParams["axes.unicode_minus"] = False
 
@@ -28,26 +31,66 @@ class HousePricePredictor:
         self.model = joblib.load(model_path)
         self.model_features = joblib.load(feature_path)
 
+        # SHAP 解釋器
         self.explainer = shap.TreeExplainer(self.model)
 
+    # =========================
+    # 特徵對齊（關鍵）
+    # =========================
     def _align_features(self, case_dict):
         df = pd.DataFrame([case_dict])
         df = pd.get_dummies(df)
 
-        # 補齊訓練時欄位
+        # 補齊訓練時的欄位
         for col in self.model_features:
             if col not in df.columns:
                 df[col] = 0
 
         return df[self.model_features]
 
+    # =========================
+    # 特徵轉中文人話
+    # =========================
+    def _feature_to_human(self, feature, value):
+        # 類別型（one-hot）
+        if feature.startswith("district_"):
+            return f"位於 {feature.replace('district_', '')}"
+
+        if feature.startswith("building_type_"):
+            return f"建物型態為「{feature.replace('building_type_', '')}」"
+
+        if feature.startswith("main_use_"):
+            return f"主要用途為「{feature.replace('main_use_', '')}」"
+
+        # 數值 / 布林型
+        HUMAN_MAP = {
+            "main_area": f"主建物面積約 {value:.1f} 坪",
+            "balcony_area": f"陽台面積約 {value:.1f} 坪",
+            "building_age": f"屋齡約 {int(value)} 年",
+            "floor": f"位於第 {int(value)} 樓",
+            "total_floors": f"建物總樓層 {int(value)} 樓",
+            "has_parking": "具備車位" if value == 1 else "未附車位",
+            "has_elevator": "設有電梯" if value == 1 else "未設電梯",
+        }
+
+        return HUMAN_MAP.get(feature, feature)
+
+    # =========================
+    # 預測主函式
+    # =========================
     def predict(self, case_dict):
+        # 特徵處理
         X = self._align_features(case_dict)
 
+        # 預測
         pred = self.model.predict(X)[0]
+
+        # SHAP 解釋
         shap_values = self.explainer(X)
 
-        # SHAP bar
+        # =========================
+        # SHAP bar（Top 5）
+        # =========================
         vals = np.abs(shap_values.values[0])
         idx = np.argsort(vals)[-5:][::-1]
 
@@ -56,15 +99,30 @@ class HousePricePredictor:
         ax.set_title("影響房價最大的因素（Top 5）")
         ax.invert_yaxis()
 
+        # =========================
         # SHAP waterfall
+        # =========================
         fig_waterfall = plt.figure(figsize=(8, 5))
         shap.plots.waterfall(shap_values[0], show=False)
 
-        # 中文說明
+        # =========================
+        # 中文估價說明（估價師語氣）
+        # =========================
         explanation = []
+
         for i in idx:
-            direction = "提高" if shap_values.values[0][i] > 0 else "降低"
-            explanation.append(f"• {X.columns[i]} 對價格有明顯{direction}影響")
+            feature = X.columns[i]
+            shap_val = shap_values.values[0][i]
+            direction = "正向支撐" if shap_val > 0 else "負向影響"
+
+            human_text = self._feature_to_human(
+                feature,
+                X.iloc[0][feature]
+            )
+
+            explanation.append(
+                f"• {human_text}，對本案單價形成{direction}。"
+            )
 
         return {
             "predicted_price": float(pred),
