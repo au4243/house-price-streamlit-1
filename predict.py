@@ -1,277 +1,118 @@
-
-import os
-import json
-from datetime import datetime
-
 import joblib
+import json
+import numpy as np
 import pandas as pd
 import shap
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 
-
-mpl.rcParams["font.family"] = "Microsoft JhengHei"
+# =========================
+# Matplotlib（Cloud-safe）
+# =========================
+mpl.rcParams["font.family"] = "Noto Sans CJK TC"
 mpl.rcParams["axes.unicode_minus"] = False
 
 
 class HousePricePredictor:
+    def __init__(self):
+        # ===== 載入模型 =====
+        self.model = joblib.load("model.pkl")
 
+        # ===== 載入特徵順序 =====
+        with open("model_features.json", encoding="utf-8") as f:
+            self.model_features = json.load(f)
 
-    def __init__(
-        self,
-        model_path: str = "xgb_house_price_model.pkl",
-        feature_path: str = "model_features.pkl",
-    ):
-
-        self.model = joblib.load(model_path)
-        self.model_features = joblib.load(feature_path)
-
-
+        # ===== SHAP Explainer（只建一次）=====
         self.explainer = shap.TreeExplainer(self.model)
 
-
-        self.categorical_cols = [
-            "district",
-            "building_type",
-            "main_use",
-        ]
-
-
-    @staticmethod
-    def _pretty_name(col: str, value=None) -> str:
-
-        if col.startswith("district_"):
-            return f"行政區：{col.replace('district_', '')}"
-
-        if col.startswith("building_type_"):
-            return f"建物型態：{col.replace('building_type_', '')}"
-
-        if col.startswith("main_use_"):
-            return f"主要用途：{col.replace('main_use_', '')}"
-
-        mapping = {
-            "building_age": "屋齡（年）",
-            "building_area_sqm": "建物移轉面積（㎡）",
-            "main_area": "主建物面積（坪）",
-            "balcony_area": "陽台面積（坪）",
-            "floor": "所在樓層",
-            "total_floors": "總樓層數",
-            "has_parking": "是否有車位",
-            "has_elevator": "是否有電梯",
-        }
-
-        name = mapping.get(col, col)
-        return f"{name} = {value}" if value is not None else name
-
-
-    def _preprocess(self, case_dict: dict) -> pd.DataFrame:
-
+    # =========================
+    # 特徵對齊（最重要）
+    # =========================
+    def _align_features(self, case_dict: dict) -> pd.DataFrame:
         df = pd.DataFrame([case_dict])
 
-        df = pd.get_dummies(
-            df,
-            columns=self.categorical_cols,
-            drop_first=False,
-        )
+        # --- One-hot encoding（示意，依你模型實際調整） ---
+        df = pd.get_dummies(df)
 
-        missing_cols = set(self.model_features) - set(df.columns)
-        if missing_cols:
-            df = pd.concat(
-                [
-                    df,
-                    pd.DataFrame(
-                        0,
-                        index=df.index,
-                        columns=list(missing_cols),
-                    ),
-                ],
-                axis=1,
-            )
+        # --- 補齊缺失欄位 ---
+        for col in self.model_features:
+            if col not in df.columns:
+                df[col] = 0
 
+        # --- 只保留訓練欄位順序 ---
         df = df[self.model_features]
+
         return df
 
+    # =========================
+    # SHAP Bar（Top 5）
+    # =========================
+    def _plot_shap_bar(self, shap_values, X):
+        shap_mean = np.abs(shap_values.values[0])
+        feature_names = X.columns
 
-    def predict(self, case_dict: dict) -> float:
-        """預測單筆房屋單價（萬 / 坪）"""
-        X_case = self._preprocess(case_dict)
-        return float(self.model.predict(X_case)[0])
+        top_idx = np.argsort(shap_mean)[-5:][::-1]
 
+        fig, ax = plt.subplots(figsize=(7, 4))
+        ax.barh(
+            feature_names[top_idx],
+            shap_mean[top_idx]
+        )
+        ax.set_title("影響房價最大的因素（Top 5）")
+        ax.invert_yaxis()
 
-    def shap_values(self, case_dict: dict):
-        """回傳單筆 SHAP values 與特徵"""
-        X_case = self._preprocess(case_dict)
-        shap_values = self.explainer.shap_values(X_case)
-        return shap_values, X_case
+        return fig
 
+    # =========================
+    # SHAP Waterfall
+    # =========================
+    def _plot_shap_waterfall(self, shap_values):
+        fig = plt.figure(figsize=(8, 5))
+        shap.plots.waterfall(shap_values[0], show=False)
+        plt.title("單筆預測 SHAP 解釋")
 
-    def generate_chinese_explanation(
-        self,
-        case_dict: dict,
-        top_n: int = 8,
-    ) -> str:
+        return fig
 
-        shap_values, X_case = self.shap_values(case_dict)
+    # =========================
+    # 中文說明生成
+    # =========================
+    def _generate_explanation(self, shap_values, X):
+        sv = shap_values.values[0]
+        features = X.columns
 
-        sv = shap_values[0]
-        base = float(self.explainer.expected_value)
-        pred = base + sv.sum()
+        idx = np.argsort(np.abs(sv))[-5:][::-1]
 
-        items = sorted(
-            zip(X_case.columns, sv, X_case.iloc[0]),
-            key=lambda x: abs(x[1]),
-            reverse=True,
-        )[:top_n]
-
-        lines = [
-            f"本模型以整體樣本平均單價 {base:.2f} 萬 / 坪為基準，",
-            f"此物件預測單價約為 {pred:.2f} 萬 / 坪。",
-            "",
-            "主要影響因素如下：",
-        ]
-
-        for col, shap_val, data in items:
-            direction = "提高" if shap_val > 0 else "降低"
+        lines = []
+        for i in idx:
+            direction = "提高" if sv[i] > 0 else "降低"
             lines.append(
-                f"- {self._pretty_name(col, data)}，"
-                f"使單價約{direction} {abs(shap_val):.2f} 萬 / 坪"
+                f"• {features[i]} 對價格有明顯{direction}影響"
             )
 
         return "\n".join(lines)
 
-    # --------------------------------------------------
-    def plot_shap_waterfall(self, case_dict: dict):
+    # =========================
+    # 對外主介面
+    # =========================
+    def predict(self, case_dict: dict) -> dict:
+        X = self._align_features(case_dict)
 
-        shap_values, X_case = self.shap_values(case_dict)
+        # ===== 預測 =====
+        pred = self.model.predict(X)[0]
 
-        shap.waterfall_plot(
-            shap.Explanation(
-                values=shap_values[0],
-                base_values=float(self.explainer.expected_value),
-                data=X_case.iloc[0],
-                feature_names=X_case.columns,
-            ),
-            show=True,
-        )
+        # ===== SHAP =====
+        shap_values = self.explainer(X)
 
+        # ===== 圖表 =====
+        shap_bar_fig = self._plot_shap_bar(shap_values, X)
+        shap_waterfall_fig = self._plot_shap_waterfall(shap_values)
 
-    def export_prediction_bundle(
-        self,
-        case_dict: dict,
-        output_root: str = "output",
-        top_n: int = 8,
-    ) -> str:
+        # ===== 中文解釋 =====
+        explanation = self._generate_explanation(shap_values, X)
 
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_dir = os.path.join(output_root, f"prediction_{timestamp}")
-        os.makedirs(output_dir, exist_ok=True)
-
-        price = self.predict(case_dict)
-        explanation = self.generate_chinese_explanation(case_dict, top_n=top_n)
-
-        with open(
-            os.path.join(output_dir, "prediction.json"),
-            "w",
-            encoding="utf-8",
-        ) as f:
-            json.dump(
-                {
-                    "input": case_dict,
-                    "predicted_price_wan_per_ping": round(price, 2),
-                },
-                f,
-                ensure_ascii=False,
-                indent=2,
-            )
-
-        with open(
-            os.path.join(output_dir, "explanation.txt"),
-            "w",
-            encoding="utf-8",
-        ) as f:
-            f.write(explanation)
-
-        shap_values, X_case = self.shap_values(case_dict)
-
-        plt.figure(figsize=(10, 6))
-        shap.waterfall_plot(
-            shap.Explanation(
-                values=shap_values[0],
-                base_values=float(self.explainer.expected_value),
-                data=X_case.iloc[0],
-                feature_names=X_case.columns,
-            ),
-            show=False,
-        )
-
-        plt.tight_layout()
-        plt.savefig(
-            os.path.join(output_dir, "shap_waterfall.png"),
-            dpi=150,
-            bbox_inches="tight",
-        )
-        plt.close()
-
-        return output_dir
-
-
-
-if __name__ == "__main__":
-
-    predictor = HousePricePredictor()
-
-    sample_case = {
-        "district": "臺北市內湖區",
-        "building_type": "住宅大樓",
-        "main_use": "住家用",
-        "building_age": 55,
-        "building_area_sqm": 45,
-        "floor": 8,
-        "total_floors": 15,
-        "main_area": 30,
-        "balcony_area": 5,
-        "has_parking": 1,
-        "has_elevator": 1,
-    }
-
-    print(f"\n預測單價：約 {predictor.predict(sample_case):.2f} 萬 / 坪\n")
-    print(predictor.generate_chinese_explanation(sample_case))
-
-    output_dir = predictor.export_prediction_bundle(sample_case)
-    print(f"\n已輸出預測結果至：{output_dir}\n")
-
-
-    case1 = {"building_type": "住宅大樓",
-        "main_use": "住家用",
-        "building_age": 55,
-        "building_area_sqm": 45,
-        "floor": 8,
-        "total_floors": 15,
-        "main_area": 30,
-        "balcony_area": 5,
-        "has_parking": 1,
-        "has_elevator": 1, "district": "臺北市萬華區" }
-    case2 = {"building_type": "住宅大樓",
-        "main_use": "住家用",
-        "building_age": 55,
-        "building_area_sqm": 45,
-        "floor": 8,
-        "total_floors": 15,
-        "main_area": 30,
-        "balcony_area": 5,
-        "has_parking": 1,
-        "has_elevator": 1, "district": "臺北市大安區" }
-    case3 = {"building_type": "住宅大樓",
-        "main_use": "住家用",
-        "building_age": 55,
-        "building_area_sqm": 45,
-        "floor": 8,
-        "total_floors": 15,
-        "main_area": 30,
-        "balcony_area": 5,
-        "has_parking": 1,
-        "has_elevator": 1, "district": "臺北市內湖區" }
-
-    print(predictor.predict(case1))
-    print(predictor.predict(case2))
-    print(predictor.predict(case3))
+        return {
+            "predicted_price": float(pred),
+            "explanation": explanation,
+            "shap_bar_fig": shap_bar_fig,
+            "shap_waterfall_fig": shap_waterfall_fig,
+        }
