@@ -1,5 +1,4 @@
 import streamlit as st
-
 from predict import HousePricePredictor
 
 # =========================
@@ -55,25 +54,11 @@ main_use = st.sidebar.selectbox(
     "主要用途", ["住家用", "商業用", "住商用"]
 )
 
-building_age = st.sidebar.number_input(
-    "屋齡（年）", 0, 80, 20
-)
-
-main_area = st.sidebar.number_input(
-    "主建物面積（坪）", 5.0, 100.0, 30.0
-)
-
-balcony_area = st.sidebar.number_input(
-    "陽台面積（坪）", 0.0, 20.0, 5.0
-)
-
-floor = st.sidebar.number_input(
-    "所在樓層", 1, 100, 5
-)
-
-total_floors = st.sidebar.number_input(
-    "總樓層數", 1, 100, 10
-)
+building_age = st.sidebar.number_input("屋齡（年）", 0, 80, 20)
+main_area = st.sidebar.number_input("主建物面積（坪）", 5.0, 100.0, 30.0)
+balcony_area = st.sidebar.number_input("陽台面積（坪）", 0.0, 20.0, 5.0)
+floor = st.sidebar.number_input("所在樓層", 1, 100, 5)
+total_floors = st.sidebar.number_input("總樓層數", 1, 100, 10)
 
 has_parking = st.sidebar.radio("是否有車位", ["有", "無"])
 has_elevator = st.sidebar.radio("是否有電梯", ["有", "無"])
@@ -99,25 +84,33 @@ case_dict = {
 # =========================
 st.subheader("📊 預測結果")
 
+# 初始化 session state
+if "result" not in st.session_state:
+    st.session_state.result = None
+
 if st.button("🚀 開始估價"):
 
     with st.spinner("模型預測中，請稍候..."):
-        result = predictor.predict(case_dict)
+        st.session_state.result = predictor.predict(case_dict)
 
-    # ===== 預測價格 =====
+# =========================
+# 顯示結果（只有在有預測後）
+# =========================
+if st.session_state.result is not None:
+    result = st.session_state.result
+
     st.success(
         f"💰 預測單價：約 **{result['predicted_price']:.1f} 萬 / 坪**"
     )
 
-    # ===== SHAP 條狀圖（主）=====
     st.markdown("### 🔍 影響價格最大的因素")
     st.info("📈 正向因素：拉高價格｜📉 負向因素：拉低價格")
     st.pyplot(result["shap_bar_fig"], use_container_width=True)
 
-    # ===== SHAP Waterfall（摺疊）=====
     with st.expander("📊 查看完整 SHAP 解釋"):
         st.pyplot(result["shap_waterfall_fig"], use_container_width=True)
 
-    # ===== 中文解釋 =====
     st.markdown("### 📝 中文估價說明")
     st.text(result["explanation"])
+else:
+    st.info("👈 請先填寫左側資料，並點擊「開始估價」")
