@@ -29,9 +29,18 @@ class HousePricePredictor:
 
     def __init__(
         self,
-        model_path: str = "xgb_house_price_model.pkl",
+        model_path: str = "model.pkl",
         feature_path: str = "model_features.pkl",
     ):
+        if not os.path.exists(model_path):
+            raise FileNotFoundError(f"❌ 找不到模型檔：{model_path}")
+
+        if not os.path.exists(feature_path):
+            raise FileNotFoundError(
+                f"❌ 找不到 model_features.pkl，請確認已 push 到 GitHub"
+            )      
+      
+      
         self.model = joblib.load(model_path)
         self.model_features = joblib.load(feature_path)
 
