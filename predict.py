@@ -3,22 +3,39 @@ import joblib
 import shap
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-import matplotlib as mpl
 
 # =========================
-# Matplotlib 中文設定
+# Matplotlib 中文字型（內嵌，跨平台穩定）
 # =========================
-mpl.rcParams["font.family"] = "Noto Sans CJK TC"
+import matplotlib.pyplot as plt
+import matplotlib as mpl
+from matplotlib import font_manager
+
+BASE_DIR = os.path.dirname(__file__)
+FONT_PATH = os.path.join(
+    BASE_DIR,
+    "fonts",
+    "NotoSansCJKtc-Regular.otf"
+)
+
+if not os.path.exists(FONT_PATH):
+    raise FileNotFoundError(
+        f"❌ 找不到中文字型檔，請確認存在：{FONT_PATH}"
+    )
+
+font_prop = font_manager.FontProperties(fname=FONT_PATH)
+
+mpl.rcParams["font.family"] = font_prop.get_name()
 mpl.rcParams["axes.unicode_minus"] = False
 
 
 class HousePricePredictor:
     def __init__(self):
-        base_dir = os.path.dirname(__file__)
-
-        model_path = os.path.join(base_dir, "model.pkl")
-        feature_path = os.path.join(base_dir, "model_features.pkl")
+        # =========================
+        # 載入模型與特徵
+        # =========================
+        model_path = os.path.join(BASE_DIR, "model.pkl")
+        feature_path = os.path.join(BASE_DIR, "model_features.pkl")
 
         if not os.path.exists(model_path):
             raise FileNotFoundError(f"❌ 找不到模型檔：{model_path}")
@@ -35,13 +52,12 @@ class HousePricePredictor:
         self.explainer = shap.TreeExplainer(self.model)
 
     # =========================
-    # 特徵對齊（關鍵）
+    # 特徵對齊（實務關鍵）
     # =========================
     def _align_features(self, case_dict):
         df = pd.DataFrame([case_dict])
         df = pd.get_dummies(df)
 
-        # 補齊訓練時的欄位
         for col in self.model_features:
             if col not in df.columns:
                 df[col] = 0
@@ -52,7 +68,6 @@ class HousePricePredictor:
     # 特徵轉中文人話
     # =========================
     def _feature_to_human(self, feature, value):
-        # 類別型（one-hot）
         if feature.startswith("district_"):
             return f"位於 {feature.replace('district_', '')}"
 
@@ -62,7 +77,6 @@ class HousePricePredictor:
         if feature.startswith("main_use_"):
             return f"主要用途為「{feature.replace('main_use_', '')}」"
 
-        # 數值 / 布林型
         HUMAN_MAP = {
             "main_area": f"主建物面積約 {value:.1f} 坪",
             "balcony_area": f"陽台面積約 {value:.1f} 坪",
@@ -76,37 +90,40 @@ class HousePricePredictor:
         return HUMAN_MAP.get(feature, feature)
 
     # =========================
-    # 預測主函式
+    # 預測主流程
     # =========================
     def predict(self, case_dict):
-        # 特徵處理
         X = self._align_features(case_dict)
 
-        # 預測
+        # 預測價格
         pred = self.model.predict(X)[0]
 
         # SHAP 解釋
         shap_values = self.explainer(X)
 
         # =========================
-        # SHAP bar（Top 5）
+        # SHAP Bar（Top 5）
         # =========================
         vals = np.abs(shap_values.values[0])
         idx = np.argsort(vals)[-5:][::-1]
 
         fig_bar, ax = plt.subplots(figsize=(7, 4))
         ax.barh(X.columns[idx], vals[idx])
-        ax.set_title("影響房價最大的因素（Top 5）")
+        ax.set_title("影響房價最大的因素（Top 5）", fontproperties=font_prop)
         ax.invert_yaxis()
 
+        # 確保座標軸也吃字型
+        for label in ax.get_yticklabels():
+            label.set_fontproperties(font_prop)
+
         # =========================
-        # SHAP waterfall
+        # SHAP Waterfall
         # =========================
         fig_waterfall = plt.figure(figsize=(8, 5))
         shap.plots.waterfall(shap_values[0], show=False)
 
         # =========================
-        # 中文估價說明（估價師語氣）
+        # 中文估價說明
         # =========================
         explanation = []
 
