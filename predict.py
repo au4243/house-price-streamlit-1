@@ -15,7 +15,7 @@ BASE_DIR = os.path.dirname(__file__)
 FONT_PATH = os.path.join(
     BASE_DIR,
     "fonts",
-    "NotoSansCJKtc-Regular.otf"
+    "NotoSansCJKtc-Regular.ttf"
 )
 
 if not os.path.exists(FONT_PATH):
