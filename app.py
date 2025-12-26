@@ -10,8 +10,8 @@ st.set_page_config(
     layout="centered",
 )
 
-st.title("🏠 房價估價與 SHAP 解釋系統")
-st.caption("XGBoost + 可解釋 AI（SHAP）｜依據 114 年 Q1~Q3 不動產成交資料")
+st.title("🏠 房價估價系統")
+st.caption("XGBoost 模型預測｜依據近期不動產成交資料")
 
 # =========================
 # 行政區對照表
@@ -92,7 +92,7 @@ if st.button("🚀 開始估價"):
         st.session_state.result = predictor.predict(case_dict)
 
 # =========================
-# 顯示結果
+# 顯示結果（純文字）
 # =========================
 if st.session_state.result is not None:
     result = st.session_state.result
@@ -101,47 +101,16 @@ if st.session_state.result is not None:
         f"💰 預測單價：約 **{result['predicted_price']:.1f} 萬 / 坪**"
     )
 
-    # =========================
-    # SHAP Bar 圖 + 解說
-    # =========================
-    st.markdown("## 🔍 影響房價最大的因素（重點分析）")
-
-    st.info(
-        "本圖顯示對本案房價影響程度最大的前五項因素。\n\n"
-        "📌 長條越長，代表該因素對價格的影響越大，"
-        "不論是拉高或拉低，皆表示模型在預測時高度重視該條件。"
-    )
-
-    st.pyplot(result["shap_bar_fig"], use_container_width=True)
-
-    # =========================
-    # SHAP Waterfall + 解說
-    # =========================
-    with st.expander("📊 查看完整價格形成過程（SHAP Waterfall 解說）"):
-        st.markdown(
-            """
-**此圖用來說明本案房價是如何一步一步計算出來的：**
-
-- 🔹 **左側基準值（Base value）**：模型在一般條件下的平均房價  
-- 🔴 **紅色區塊**：將價格往上推高的正向條件  
-- 🔵 **藍色區塊**：使價格下修的負向條件  
-- 🔹 **最右側**：本案最終預測單價  
-
-📌 每一段長度代表該條件對價格的實際影響幅度，  
-所有因素加總後，即形成目前顯示的估價結果。
-            """
-        )
-
-        st.pyplot(result["shap_waterfall_fig"], use_container_width=True)
-
-    # =========================
-    # 中文估價說明
-    # =========================
     st.markdown("## 📝 中文估價說明")
 
     st.markdown(
         result["explanation"]
         .replace("•", "👉")
+    )
+
+    st.caption(
+        "⚠️ 本估價結果為模型依歷史成交資料推估，"
+        "僅供參考，實際價格仍應以現場條件與市場議價為準。"
     )
 
 else:
