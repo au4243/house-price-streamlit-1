@@ -55,10 +55,10 @@ class HousePricePredictor:
 
         # 累加所有特徵 SHAP 值，保證文字總和 == 預測值
         cumulative_price = base_value
-        explanation_lines = [f"📌 模型基準單價約為 {base_value:.1f} 萬 / 坪，以下條件使價格進行調整："]
+        explanation_lines = [f"📌 模型基準單價約為 {base_value:.1f} 萬 / 坪，以下主要條件使價格進行調整："]
 
         # 顯示 Top 5 影響因素文字
-        idx_sorted = np.argsort(np.abs(shap_vals))[-5:][::-1]
+        idx_sorted = np.argsort(np.abs(shap_vals))[-10:][::-1]
         for i in idx_sorted:
             feat = feature_names[i]
             val = X.iloc[0][feat]
