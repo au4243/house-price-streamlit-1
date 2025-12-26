@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 
 # =========================
-# Matplotlib 中文字型（內嵌，跨平台穩定）
+# Matplotlib（中文安全設定）
 # =========================
 import matplotlib.pyplot as plt
 import matplotlib as mpl
@@ -15,24 +15,27 @@ BASE_DIR = os.path.dirname(__file__)
 FONT_PATH = os.path.join(
     BASE_DIR,
     "fonts",
-    "NotoSansCJKtc-Regular.ttf"
+    "NotoSansCJKtc-Regular.otf"
 )
 
-if not os.path.exists(FONT_PATH):
-    raise FileNotFoundError(
-        f"❌ 找不到中文字型檔，請確認存在：{FONT_PATH}"
-    )
+# 嘗試載入中文字型（找不到也不會中斷）
+font_prop = None
+if os.path.exists(FONT_PATH):
+    try:
+        font_prop = font_manager.FontProperties(fname=FONT_PATH)
+        mpl.rcParams["font.family"] = font_prop.get_name()
+    except Exception:
+        mpl.rcParams["font.family"] = "sans-serif"
+else:
+    mpl.rcParams["font.family"] = "sans-serif"
 
-font_prop = font_manager.FontProperties(fname=FONT_PATH)
-
-mpl.rcParams["font.family"] = font_prop.get_name()
 mpl.rcParams["axes.unicode_minus"] = False
 
 
 class HousePricePredictor:
     def __init__(self):
         # =========================
-        # 載入模型與特徵
+        # 載入模型
         # =========================
         model_path = os.path.join(BASE_DIR, "model.pkl")
         feature_path = os.path.join(BASE_DIR, "model_features.pkl")
@@ -109,12 +112,17 @@ class HousePricePredictor:
 
         fig_bar, ax = plt.subplots(figsize=(7, 4))
         ax.barh(X.columns[idx], vals[idx])
-        ax.set_title("影響房價最大的因素（Top 5）", fontproperties=font_prop)
         ax.invert_yaxis()
 
-        # 確保座標軸也吃字型
-        for label in ax.get_yticklabels():
-            label.set_fontproperties(font_prop)
+        ax.set_title(
+            "影響房價最大的因素（Top 5）",
+            fontproperties=font_prop if font_prop else None
+        )
+
+        # y 軸字型保險處理
+        if font_prop:
+            for label in ax.get_yticklabels():
+                label.set_fontproperties(font_prop)
 
         # =========================
         # SHAP Waterfall
