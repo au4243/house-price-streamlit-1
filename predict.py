@@ -15,7 +15,7 @@ BASE_DIR = os.path.dirname(__file__)
 FONT_PATH = os.path.join(
     BASE_DIR,
     "fonts",
-    "NotoSansCJKtc-Regular.otf"
+    "NotoSansCJKtc-Regular.ttf"
 )
 
 # 嘗試載入中文字型（找不到也不會中斷）
