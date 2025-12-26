@@ -10,8 +10,8 @@ st.set_page_config(
     layout="centered",
 )
 
-st.title("🏠 房價估價系統")
-st.caption("XGBoost 模型預測｜依據近期不動產成交資料")
+st.title("🏠 房價估價系統（文字版）")
+st.caption("XGBoost + 可解釋 AI（SHAP）｜依據 114 年 Q1~Q3 不動產成交資料")
 
 # =========================
 # 行政區對照表
@@ -82,7 +82,7 @@ case_dict = {
 # =========================
 # 主畫面
 # =========================
-st.subheader("📊 預測結果")
+st.subheader("📊 預測結果（文字版）")
 
 if "result" not in st.session_state:
     st.session_state.result = None
@@ -92,25 +92,15 @@ if st.button("🚀 開始估價"):
         st.session_state.result = predictor.predict(case_dict)
 
 # =========================
-# 顯示結果（純文字）
+# 顯示文字結果
 # =========================
 if st.session_state.result is not None:
     result = st.session_state.result
+    st.markdown("## 📝 中文估價說明")
+    st.text(result["explanation"])
 
     st.success(
-        f"💰 預測單價：約 **{result['predicted_price']:.1f} 萬 / 坪**"
-    )
-
-    st.markdown("## 📝 中文估價說明")
-
-    st.markdown(
-        result["explanation"]
-        .replace("•", "👉")
-    )
-
-    st.caption(
-        "⚠️ 本估價結果為模型依歷史成交資料推估，"
-        "僅供參考，實際價格仍應以現場條件與市場議價為準。"
+        f"💰 模型最終預估單價：約 **{result['predicted_price']:.1f} 萬 / 坪**"
     )
 
 else:
