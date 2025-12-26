@@ -71,7 +71,7 @@ class HousePricePredictor:
         explanation = self._text_feature_importance(X)
 
         return {
-            "prediction": round(pred_price, 2),
+            "predicted_price": round(pred_price, 2),
             "explanation": explanation,
         }
 
