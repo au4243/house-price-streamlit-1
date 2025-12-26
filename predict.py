@@ -1,111 +1,102 @@
-# predict.py
 import os
 import joblib
-import pandas as pd
+import shap
 import numpy as np
+import pandas as pd
 
 
 class HousePricePredictor:
-    """
-    房價預測器（Streamlit Cloud 安全版）
-    - 不使用 matplotlib
-    - 不顯示任何圖
-    - 不處理中文字型
-    - 只輸出「預測結果 + 文字解說」
-    """
+    def __init__(self):
+        base_dir = os.path.dirname(__file__)
 
-    def __init__(
-        self,
-        model_path="model.pkl",
-        feature_path="model_features.pkl",
-    ):
-        # =========================
-        # 檔案存在檢查
-        # =========================
+        model_path = os.path.join(base_dir, "model.pkl")
+        feature_path = os.path.join(base_dir, "model_features.pkl")
+
         if not os.path.exists(model_path):
             raise FileNotFoundError(f"❌ 找不到模型檔：{model_path}")
 
         if not os.path.exists(feature_path):
-            raise FileNotFoundError(f"❌ 找不到特徵檔：{feature_path}")
+            raise FileNotFoundError(
+                f"❌ 找不到 model_features.pkl，請確認已 push 到 GitHub"
+            )
 
-        # =========================
-        # 載入模型與特徵
-        # =========================
         self.model = joblib.load(model_path)
         self.model_features = joblib.load(feature_path)
 
-    # =========================
-    # 特徵對齊（非常重要）
-    # =========================
-    def _align_features(self, input_df: pd.DataFrame) -> pd.DataFrame:
-        df = input_df.copy()
+        # SHAP explainer（不畫圖，安全）
+        self.explainer = shap.TreeExplainer(self.model)
 
-        # 缺的欄位補 0
+    # =========================
+    # 特徵對齊（關鍵）
+    # =========================
+    def _align_features(self, case_dict):
+        df = pd.DataFrame([case_dict])
+        df = pd.get_dummies(df)
+
         for col in self.model_features:
             if col not in df.columns:
                 df[col] = 0
 
-        # 多的欄位刪掉
-        df = df[self.model_features]
-
-        return df
+        return df[self.model_features]
 
     # =========================
-    # 預測主流程
+    # 特徵轉中文人話
     # =========================
-    def predict(self, input_data: dict) -> dict:
-        """
-        input_data: dict（來自 Streamlit 表單）
-        """
+    def _feature_to_human(self, feature, value):
+        if feature.startswith("district_"):
+            return f"位於「{feature.replace('district_', '')}」"
 
-        # 轉成 DataFrame
-        input_df = pd.DataFrame([input_data])
+        if feature.startswith("building_type_"):
+            return f"建物型態為「{feature.replace('building_type_', '')}」"
 
-        # 特徵對齊
-        X = self._align_features(input_df)
+        if feature.startswith("main_use_"):
+            return f"主要用途為「{feature.replace('main_use_', '')}」"
 
-        # 預測
-        pred_price = float(self.model.predict(X)[0])
-
-        # 文字版特徵影響說明
-        explanation = self._text_feature_importance(X)
-
-        return {
-            "predicted_price": round(pred_price, 2),
-            "explanation": explanation,
+        HUMAN_MAP = {
+            "main_area": f"主建物面積約 {value:.1f} 坪",
+            "balcony_area": f"陽台面積約 {value:.1f} 坪",
+            "building_age": f"屋齡約 {int(value)} 年",
+            "floor": f"位於第 {int(value)} 樓",
+            "total_floors": f"建物總樓層 {int(value)} 樓",
+            "has_parking": "具備車位" if value == 1 else "未附車位",
+            "has_elevator": "設有電梯" if value == 1 else "未設電梯",
         }
 
-    # =========================
-    # 文字版特徵重要性
-    # =========================
-    def _text_feature_importance(self, X: pd.DataFrame, top_n: int = 5) -> list:
-        """
-        回傳文字解說（不畫圖、不用 shap）
-        """
+        return HUMAN_MAP.get(feature, feature)
 
-        explanations = []
+    # =========================
+    # 預測主函式（無圖版本）
+    # =========================
+    def predict(self, case_dict):
+        X = self._align_features(case_dict)
 
-        # Tree-based model（XGBoost / RandomForest）
-        if hasattr(self.model, "feature_importances_"):
-            importances = self.model.feature_importances_
-            importance_df = pd.DataFrame(
-                {
-                    "feature": self.model_features,
-                    "importance": importances,
-                    "value": X.iloc[0].values,
-                }
+        # 預測單價
+        pred = float(self.model.predict(X)[0])
+
+        # SHAP 計算（不畫圖）
+        shap_values = self.explainer(X)
+
+        vals = np.abs(shap_values.values[0])
+        idx = np.argsort(vals)[-5:][::-1]
+
+        explanation = []
+
+        for i in idx:
+            feature = X.columns[i]
+            shap_val = shap_values.values[0][i]
+
+            direction = "正向支撐" if shap_val > 0 else "負向影響"
+
+            human_text = self._feature_to_human(
+                feature,
+                X.iloc[0][feature]
             )
 
-            importance_df = importance_df.sort_values(
-                by="importance", ascending=False
-            ).head(top_n)
+            explanation.append(
+                f"• {human_text}，對本案單價形成{direction}。"
+            )
 
-            for _, row in importance_df.iterrows():
-                explanations.append(
-                    f"{row['feature']} 對預測有明顯影響（權重 {row['importance']:.3f}，輸入值 {row['value']}）"
-                )
-
-        else:
-            explanations.append("此模型不支援特徵重要性分析")
-
-        return explanations
+        return {
+            "predicted_price": pred,
+            "explanation": "\n".join(explanation),
+        }
