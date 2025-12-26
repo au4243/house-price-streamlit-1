@@ -23,7 +23,7 @@ class HousePricePredictor:
         self.model = joblib.load(model_path)
         self.model_features = joblib.load(feature_path)
 
-        # SHAP explainer（不畫圖，安全）
+        # SHAP 解釋器（XGBoost / Tree-based 專用）
         self.explainer = shap.TreeExplainer(self.model)
 
     # =========================
@@ -40,7 +40,7 @@ class HousePricePredictor:
         return df[self.model_features]
 
     # =========================
-    # 特徵轉中文人話
+    # 特徵翻成人話
     # =========================
     def _feature_to_human(self, feature, value):
         if feature.startswith("district_"):
@@ -65,27 +65,36 @@ class HousePricePredictor:
         return HUMAN_MAP.get(feature, feature)
 
     # =========================
-    # 預測主函式（無圖版本）
+    # 預測主流程（含金額解釋）
     # =========================
     def predict(self, case_dict):
         X = self._align_features(case_dict)
 
-        # 預測單價
-        pred = float(self.model.predict(X)[0])
+        # 預測單價（萬 / 坪）
+        pred_price = float(self.model.predict(X)[0])
 
-        # SHAP 計算（不畫圖）
+        # SHAP 解釋
         shap_values = self.explainer(X)
 
-        vals = np.abs(shap_values.values[0])
-        idx = np.argsort(vals)[-5:][::-1]
+        base_value = shap_values.base_values[0]
+        shap_contribs = shap_values.values[0]
+
+        # 取影響最大的前 5 項
+        idx = np.argsort(np.abs(shap_contribs))[-5:][::-1]
 
         explanation = []
 
+        explanation.append(
+            f"📌 模型基準單價約為 **{base_value:.1f} 萬 / 坪**，"
+            "以下條件使價格進行調整："
+        )
+
         for i in idx:
             feature = X.columns[i]
-            shap_val = shap_values.values[0][i]
+            shap_val = shap_contribs[i]
 
-            direction = "正向支撐" if shap_val > 0 else "負向影響"
+            direction = "推升" if shap_val > 0 else "下修"
+            amount = abs(shap_val)
 
             human_text = self._feature_to_human(
                 feature,
@@ -93,10 +102,15 @@ class HousePricePredictor:
             )
 
             explanation.append(
-                f"• {human_text}，對本案單價形成{direction}。"
+                f"• {human_text}，使單價約 **{direction} {amount:.1f} 萬 / 坪**。"
             )
 
+        explanation.append(
+            f"\n➡️ 綜合以上因素後，模型推估本案合理單價約為 "
+            f"**{pred_price:.1f} 萬 / 坪**。"
+        )
+
         return {
-            "predicted_price": pred,
+            "predicted_price": pred_price,
             "explanation": "\n".join(explanation),
         }
